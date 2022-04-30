@@ -5,7 +5,7 @@ from bytes import bytes_to_arr
 
 BLOCK_SIZE = 128
 
-def generate_key():
+def generateAESKey():
     key = []
     n = random.randint(0, 0xffffffffffffffffffffffffffffffff)
     for i in range(int(BLOCK_SIZE/8)):

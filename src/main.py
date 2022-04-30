@@ -1,0 +1,101 @@
+import argparse, os, sys, base64
+from rsakey import generateRSAKey, parse_key
+import rsa
+import aeskey
+import aes
+from oaep import oaep_encode, oaep_decode, sha3_256
+from util import str2bool
+from bytes import bytes_to_arr, arr_to_bytes
+import sign as signature
+
+parser = argparse.ArgumentParser(description='Cifra e decifra usando o RSA.', formatter_class=argparse.RawTextHelpFormatter)
+
+parser.add_argument('mensagem', type=argparse.FileType('rb'), help='Arquivo com a mensagem a ser cifrada/decifrada')
+parser.add_argument('-k', nargs='?', type=argparse.FileType('r'), help='Arquivo com a chave pública ou privada (a depender do modo usado). Se não informado, serão geradas as chaves automaticamente que serão salvas no arquivo \'keys/key_[id incremental]\'', metavar='chave')
+parser.add_argument('-s', nargs='?', type=argparse.FileType('r'), help='Arquivo com a chave de sessão para a cifração simétrica da mensagem. Se não informado, será gerada no arquivo \'keys/session_[id incremental]\'', metavar='session')
+parser.add_argument('-o', type=argparse.FileType('wb'), help='Arquivo de saída', metavar='output', required=True)
+parser.add_argument('-d', nargs='?', type=str2bool, const=True, default=False, help='Especifica que a mensagem deve ser decifrada na execução (padrão: cifrar)', metavar='decifrar')
+
+args = parser.parse_args()
+
+os.chdir(os.path.dirname(sys.argv[0]))
+
+m = 0
+m_blocks = []
+with args.mensagem as f:
+    byte = f.read(1)
+    while byte != b"":
+        m_blocks.append(ord(byte))
+        m <<= 8
+        m |= ord(byte)
+        byte = f.read(1)
+
+pswd = session = None
+if args.k == None:
+    if args.d:
+        print("Para verificar a assinatura, é necessário passar a chave pública!")
+        exit()
+
+    key_pub, key = generateRSAKey(2048)
+    pswd = key_pub if args.d else key
+else:
+    try:
+        pswd = parse_key(args.k, args.d)
+    except Exception as e:
+        print(e)
+        exit()
+
+if args.s == None:
+    if args.d:
+        print("Para decifrar, é necessário passar a chave de sessão")
+
+    session = aeskey.generateAESKey()
+else:
+    try:
+        content = ""
+        with args.s as f:
+            content = base64.b64decode(f.read())
+        
+        cont_bytes = [x for x in content]
+
+        if args.d:
+            content = arr_to_bytes(cont_bytes)
+
+            decripted = rsa.decrypt(content, pswd)
+            cont_bytes = bytes_to_arr(decripted)
+
+        session = aeskey.parse_key(cont_bytes)
+
+    except Exception as e:
+        print(e)
+        exit()
+
+res = aes.Cipher(m_blocks.copy(), session.copy())
+
+if not args.d and args.s == None:
+    secret = rsa.encrypt(arr_to_bytes(session), pswd)
+    aeskey.save_keys(session, secret)
+
+
+file = args.mensagem if args.d else args.o
+file_attr = file.name.split(".")
+filename = ".".join(file_attr[:-1]) if len(file_attr) > 1 else file_attr[0]
+
+blocks = []
+for block in res.blocks:
+    blocks += block
+
+if args.d:
+    signature.verify(filename, m_blocks, pswd)
+else:
+    signature.generate(filename, blocks, pswd)
+
+with args.o as f:
+    if args.d:
+        for i in range(15):
+            if blocks[-1] == ord('{'):
+                blocks.pop()
+            else:
+                break
+
+    f.write(bytes(blocks))
