@@ -1,6 +1,6 @@
 import random, base64, os
 from primes import generateLargePrime
-from bytes import bytes_to_str
+from bytes import bytes_to_str, str_to_bytes
 
 def gcd(a, b):
     while a != 0:
@@ -18,7 +18,10 @@ def findModInverse(a, m):
         v1, v2, v3, u1, u2, u3 = (u1 - q * v1), (u2 - q * v2), (u3 - q * v3), v1, v2, v3
     return u1 % m
 
-def generateRSAKey(keySize):
+def generateRSAKey():
+    keySize = 1024
+    size = keySize * 2
+    print(size)
     print('Gerando p primo...')
     p = generateLargePrime(keySize)
     print('Gerando q primo...')
@@ -34,15 +37,15 @@ def generateRSAKey(keySize):
     # Step 3: Calculate d, the mod inverse of e.
     print('Calculando "d" que é mod inverso de e...')
     d = findModInverse(e, (p - 1) * (q - 1))
-    publicKey = (n, e)
-    privateKey = (n, d)
+    publicKey = [n, e]
+    privateKey = [d, p, q]
     print('\n----------Chave pública----------\n', publicKey)
     print('\n----------Chave privada----------\n', privateKey)
 
-    store_keys(publicKey, privateKey, keySize)
+    store_keys(publicKey, privateKey, size)
     return (publicKey, privateKey)
 
-def store_keys(pub, priv, size=2048):
+def store_keys(pub, priv, size):
     def generate_file(path, key):
         with open(path, "w") as f:
             res = ""

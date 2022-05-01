@@ -36,7 +36,7 @@ if args.k == None:
         print("Para verificar a assinatura, é necessário passar a chave pública!")
         exit()
 
-    key_pub, key = generateRSAKey(2048)
+    key_pub, key = generateRSAKey()
     pswd = key_pub if args.d else key
 else:
     try:
